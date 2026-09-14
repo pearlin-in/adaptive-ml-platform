@@ -1,0 +1,19 @@
+# Environments & Cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+
+# Large Datasets & Raw Data
+data/*
+!data/.gitkeep
+
+# Model Artifacts (Tracked via registry manifest instead)
+models/*/*.joblib
+models/*/*.pt
+models/*/*.onnx
+models/*/*.parquet
+models/*/*.safetensors

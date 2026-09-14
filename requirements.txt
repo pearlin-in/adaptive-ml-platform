@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+scikit-learn
+lightgbm
+torch
+transformers
+streamlit
+pandas
+numpy
+scipy

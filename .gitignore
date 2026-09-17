@@ -11,9 +11,17 @@ __pycache__/
 data/*
 !data/.gitkeep
 
-# Model Artifacts (Tracked via registry manifest instead)
-models/*/*.joblib
-models/*/*.pt
-models/*/*.onnx
-models/*/*.parquet
-models/*/*.safetensors
+# Large Model Weights (Binary Binaries > 100MB)
+*.safetensors
+*.bin
+*.h5
+*.onnx
+*.joblib
+models/*/*.pth
+models/*/*.pkl
+
+# Exception Rules (Ensure metadata, configs, JSONs & drift embeddings ARE tracked)
+!models/**/*.json
+!models/**/reference_embeddings_v1.pt
+!models/**/tokenizer_config.json
+!models/**/config.json

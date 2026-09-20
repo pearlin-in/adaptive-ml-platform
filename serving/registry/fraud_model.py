@@ -27,4 +27,4 @@ class FraudModel(ModelVersion):
     def embed(self, raw_input: dict):
         df = pd.DataFrame([raw_input])
         df[["Time", "Amount"]] = self.scaler.transform(df[["Time", "Amount"]])
-        return df.values[0]
+        return df.iloc[0]

@@ -1,37 +1,52 @@
 from contextlib import asynccontextmanager
 import hashlib
 import io
+import json
 import time
 import uuid
+import asyncio
 
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from PIL import Image
 from pydantic import BaseModel
 
-# Core platform modules
+from drift.monitor import DriftMonitor, MIN_WINDOW_SIZE
 from serving.batcher import MicroBatcher
 from serving.metrics_store import MetricsStore
 from serving.registry.registry import ModelRegistry
 from serving.routing import Router
 
-# State instances
+# Initialize core services
 registry = ModelRegistry()
 metrics_store = MetricsStore()
 router = Router()
+drift_monitor = DriftMonitor(db_path="serving/predictions.db")
 
-# Active batchers cache: (model_id, version) -> MicroBatcher
 batchers: dict[tuple[str, str], MicroBatcher] = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start async background telemetry queue
+    # Startup: Start background telemetry store
     await metrics_store.start()
 
-    yield  # Application processes requests here
+    # Load manifest and register drift reference datasets
+    with open("models/manifest.json", "r") as f:
+        manifest = json.load(f)
 
-    # Shutdown: Stop metrics drainer and all active worker batchers cleanly
+    for model_id in ("fraud", "satellite", "ai_text"):
+        if model_id in manifest:
+            active_v = manifest[model_id]["active_version"]
+            ref_file = manifest[model_id]["versions"][active_v]["reference_file"]
+            drift_monitor.register_reference(model_id, active_v, ref_file)
+
+    await drift_monitor.start()
+
+    yield  # Application runs here
+
+    # Shutdown: Stop monitors and batch workers
+    await drift_monitor.stop()
     await metrics_store.stop()
     for batcher in batchers.values():
         await batcher.stop()
@@ -40,7 +55,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Adaptive ML Serving Engine", lifespan=lifespan)
 
 
-# --- Input Payloads ---
+# --- Input Models ---
 class FraudInput(BaseModel):
     Time: float
     Amount: float
@@ -78,9 +93,8 @@ class TextInput(BaseModel):
     text: str
 
 
-# --- Helper Functions ---
+# --- Helpers ---
 async def get_batcher(model_id: str, version: str) -> MicroBatcher:
-    """Retrieves or dynamically instantiates and starts a MicroBatcher worker."""
     key = (model_id, version)
     if key not in batchers:
         model = registry.get(model_id, version)
@@ -91,32 +105,42 @@ async def get_batcher(model_id: str, version: str) -> MicroBatcher:
 
 
 def summarize_bytes(data: bytes) -> dict:
-    """Generates an anonymized hash + payload size summary for non-PII logging."""
     return {
         "hash": hashlib.sha256(data).hexdigest()[:16],
-        "size_bytes": len(data)
+        "size_bytes": len(data),
     }
 
 
-# --- Endpoint Handlers ---
+# --- Endpoints ---
 @app.post("/predict/fraud")
-async def predict_fraud(payload: FraudInput, x_user_id: str | None = Header(default=None)):
+async def predict_fraud(
+    payload: FraudInput, x_user_id: str | None = Header(default=None)
+):
     request_id = str(uuid.uuid4())
     version = router.route("fraud", x_user_id or request_id)
+    model = registry.get("fraud", version)
     start = time.perf_counter()
     result, confidence, error = None, None, None
 
-    payload_dict = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    payload_dict = (
+        payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    )
     raw_bytes = str(payload_dict).encode("utf-8")
 
     try:
         batcher = await get_batcher("fraud", version)
         result, confidence = await batcher.submit(payload_dict)
+
+        # Offload embedding/feature vector extraction for drift tracking
+        loop = asyncio.get_event_loop()
+        vector = await loop.run_in_executor(None, model.embed, payload_dict)
+        drift_monitor.record_sample("fraud", version, vector)
+
         return {
             "request_id": request_id,
             "version_served": version,
             "result": result,
-            "confidence": confidence
+            "confidence": confidence,
         }
     except Exception as e:
         error = str(e)
@@ -130,14 +154,17 @@ async def predict_fraud(payload: FraudInput, x_user_id: str | None = Header(defa
             input_summary=summarize_bytes(raw_bytes),
             output=result,
             confidence=confidence,
-            error=error
+            error=error,
         )
 
 
 @app.post("/predict/satellite")
-async def predict_satellite(file: UploadFile = File(...), x_user_id: str | None = Header(default=None)):
+async def predict_satellite(
+    file: UploadFile = File(...), x_user_id: str | None = Header(default=None)
+):
     request_id = str(uuid.uuid4())
     version = router.route("satellite", x_user_id or request_id)
+    model = registry.get("satellite", version)
     start = time.perf_counter()
     result, confidence, error = None, None, None
 
@@ -146,11 +173,17 @@ async def predict_satellite(file: UploadFile = File(...), x_user_id: str | None 
         pil_img = Image.open(io.BytesIO(image_bytes))
         batcher = await get_batcher("satellite", version)
         result, confidence = await batcher.submit(pil_img)
+
+        # Extract image embedding asynchronously for drift monitoring
+        loop = asyncio.get_event_loop()
+        vector = await loop.run_in_executor(None, model.embed, pil_img)
+        drift_monitor.record_sample("satellite", version, vector)
+
         return {
             "request_id": request_id,
             "version_served": version,
             "result": result,
-            "confidence": confidence
+            "confidence": confidence,
         }
     except Exception as e:
         error = str(e)
@@ -164,14 +197,17 @@ async def predict_satellite(file: UploadFile = File(...), x_user_id: str | None 
             input_summary=summarize_bytes(image_bytes),
             output=result,
             confidence=confidence,
-            error=error
+            error=error,
         )
 
 
 @app.post("/predict/ai_text")
-async def predict_text(payload: TextInput, x_user_id: str | None = Header(default=None)):
+async def predict_text(
+    payload: TextInput, x_user_id: str | None = Header(default=None)
+):
     request_id = str(uuid.uuid4())
     version = router.route("ai_text", x_user_id or request_id)
+    model = registry.get("ai_text", version)
     start = time.perf_counter()
     result, confidence, error = None, None, None
 
@@ -179,11 +215,17 @@ async def predict_text(payload: TextInput, x_user_id: str | None = Header(defaul
     try:
         batcher = await get_batcher("ai_text", version)
         result, confidence = await batcher.submit(payload.text)
+
+        # Extract text embedding asynchronously for drift monitoring
+        loop = asyncio.get_event_loop()
+        vector = await loop.run_in_executor(None, model.embed, payload.text)
+        drift_monitor.record_sample("ai_text", version, vector)
+
         return {
             "request_id": request_id,
             "version_served": version,
             "result": result,
-            "confidence": confidence
+            "confidence": confidence,
         }
     except Exception as e:
         error = str(e)
@@ -197,10 +239,22 @@ async def predict_text(payload: TextInput, x_user_id: str | None = Header(defaul
             input_summary=summarize_bytes(raw_bytes),
             output=result,
             confidence=confidence,
-            error=error
+            error=error,
         )
 
 
 @app.get("/metrics")
 async def metrics():
     return PlainTextResponse(metrics_store.render_prometheus())
+
+
+@app.get("/drift/{model_id}")
+async def get_drift(model_id: str, version: str = "v1"):
+    latest = drift_monitor.get_latest(model_id, version)
+    if latest is None:
+        return {
+            "status": "insufficient_data",
+            "min_window_size": MIN_WINDOW_SIZE,
+            "current_samples": len(drift_monitor.buffers[(model_id, version)]),
+        }
+    return latest

@@ -95,13 +95,19 @@ class FraudInput(BaseModel):
 class TextInput(BaseModel):
     text: str
 
+#Per-model batcher configuration tailored to model compute profile
+BATCH_CONFIG = {
+    "fraud":     {"max_latency_ms": 10.0,  "max_batch_size": 32},
+    "satellite": {"max_latency_ms": 20.0,  "max_batch_size": 16},
+    "ai_text":   {"max_latency_ms": 150.0, "max_batch_size": 8},
+}
 
 # --- Helpers ---
 async def get_batcher(model_id: str, version: str) -> MicroBatcher:
     key = (model_id, version)
     if key not in batchers:
-        model = registry.get(model_id, version)
-        b = MicroBatcher(model, max_latency_ms=30, max_batch_size=16)
+        cfg = BATCH_CONFIG[model_id]
+        b = MicroBatcher(registry.get(model_id, version), **cfg)
         await b.start()
         batchers[key] = b
     return batchers[key]

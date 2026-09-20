@@ -1,4 +1,3 @@
-# serving/registry/satellite_model.py
 import torch
 from torchvision import transforms
 from torchvision.models import mobilenet_v3_small
@@ -12,17 +11,26 @@ class SatelliteModel(ModelVersion):
         self.model.eval()
         self.class_names = class_names
         self.transform = transforms.Compose([
-            transforms.Resize((64, 64)), transforms.ToTensor(),
+            transforms.Resize((64, 64)),
+            transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
-    def predict(self, raw_input):  # PIL Image
-        x = self.transform(raw_input.convert("RGB")).unsqueeze(0)
+    def predict(self, raw_input):
+        return self.predict_batch([raw_input])[0]
+
+    def predict_batch(self, raw_inputs: list) -> list[tuple[dict, float]]:
+        tensors = [self.transform(img.convert("RGB")) for img in raw_inputs]
+        batch_tensor = torch.stack(tensors)
         with torch.no_grad():
-            logits = self.model(x)
-            probs = torch.softmax(logits, dim=1)[0]
-        idx = int(probs.argmax())
-        return {"label": self.class_names[idx]}, float(probs[idx])
+            logits = self.model(batch_tensor)
+            probs = torch.softmax(logits, dim=1)
+        
+        results = []
+        for prob in probs:
+            idx = int(prob.argmax())
+            results.append(({"label": self.class_names[idx]}, float(prob[idx])))
+        return results
 
     def embed(self, raw_input):
         x = self.transform(raw_input.convert("RGB")).unsqueeze(0)

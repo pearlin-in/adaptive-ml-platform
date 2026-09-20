@@ -7,7 +7,8 @@ import time
 import uuid
 import asyncio
 
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile, Query
+from typing import Optional
 from fastapi.responses import PlainTextResponse
 from PIL import Image
 from pydantic import BaseModel
@@ -281,3 +282,46 @@ async def get_incidents(model_id: str | None = None, limit: int = 50):
     rows = conn.execute(query, params + (limit,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+# ============================================================================
+# DASHBOARD TELEMETRY & REGISTRY ENDPOINTS (JSON)
+# ============================================================================
+
+@app.get("/registry")
+async def get_registry():
+    """
+    Dashboard-facing view of active model versions, available versions, 
+    and canary routing state.
+    """
+    result = {}
+    for model_id, manifest_entry in registry.manifest.items():
+        routing_entry = router.config.get(model_id, {})
+        result[model_id] = {
+            "active_version": manifest_entry["active_version"],
+            "available_versions": list(manifest_entry["versions"].keys()),
+            "canary": routing_entry.get("canary"),
+            "canary_percent": routing_entry.get("canary_percent", 0),
+        }
+    return result
+
+
+@app.get("/stats/{model_id}")
+async def get_stats(model_id: str, version: Optional[str] = Query(default=None)):
+    """
+    Returns real-time request counts, error counts, and latency percentiles 
+    (P50, P95, P99) directly from MetricsStore for React dashboard polling.
+    """
+    if model_id not in registry.manifest:
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found in registry.")
+
+    versions = [version] if version else list(registry.manifest[model_id]["versions"].keys())
+    out = {}
+    
+    for v in versions:
+        key = (model_id, v)
+        out[v] = {
+            "requests_total": metrics_store.request_counts.get(key, 0),
+            "errors_total": metrics_store.error_counts.get(key, 0),
+            **metrics_store.percentiles(model_id, v),
+        }
+    return out

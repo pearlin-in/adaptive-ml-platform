@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import hashlib
 import io
 import json
+import sqlite3
 import time
 import uuid
 import asyncio
@@ -16,13 +17,15 @@ from serving.batcher import MicroBatcher
 from serving.metrics_store import MetricsStore
 from serving.registry.registry import ModelRegistry
 from serving.routing import Router
+from serving.incident_response import IncidentResponder
 
 # Initialize core services
 registry = ModelRegistry()
 metrics_store = MetricsStore()
 router = Router()
 drift_monitor = DriftMonitor(db_path="serving/predictions.db")
-
+incident_responder = IncidentResponder(router=router, registry=registry, db_path="serving/predictions.db")
+drift_monitor.on_breach(incident_responder.handle_breach)
 batchers: dict[tuple[str, str], MicroBatcher] = {}
 
 
@@ -258,3 +261,17 @@ async def get_drift(model_id: str, version: str = "v1"):
             "current_samples": len(drift_monitor.buffers[(model_id, version)]),
         }
     return latest
+
+@app.get("/incidents")
+async def get_incidents(model_id: str | None = None, limit: int = 50):
+    conn = sqlite3.connect("serving/predictions.db")
+    conn.row_factory = sqlite3.Row
+    query = "SELECT * FROM incidents"
+    params = ()
+    if model_id:
+        query += " WHERE model_id = ?"
+        params = (model_id,)
+    query += " ORDER BY timestamp DESC LIMIT ?"
+    rows = conn.execute(query, params + (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

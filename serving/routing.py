@@ -30,3 +30,9 @@ class Router:
         cfg = self.config[model_id]
         cfg["stable"], cfg["canary"], cfg["canary_percent"] = cfg["canary"], None, 0
         self._save()
+
+    def set_active_stable(self, model_id: str, version: str):
+        self.config[model_id]["stable"] = version
+        self.config[model_id]["canary"] = None
+        self.config[model_id]["canary_percent"] = 0
+        self._save()

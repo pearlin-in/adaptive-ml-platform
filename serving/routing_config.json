@@ -1,0 +1,5 @@
+{
+  "fraud": {"stable": "v1", "canary": null, "canary_percent": 0},
+  "satellite": {"stable": "v1", "canary": null, "canary_percent": 0},
+  "ai_text": {"stable": "v1", "canary": null, "canary_percent": 0}
+}

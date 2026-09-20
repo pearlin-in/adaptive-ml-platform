@@ -1,0 +1,6 @@
+
+{
+  "fraud": {"active_version": "v1", "versions": {"v1": {"path": "models/fraud", "metrics_file": "models/fraud/metrics_v1.json"}}},
+  "satellite": {"active_version": "v1", "versions": {"v1": {"path": "models/satellite", "metrics_file": "models/satellite/metrics_v1.json"}}},
+  "ai_text": {"active_version": "v1", "versions": {"v1": {"path": "models/ai_text/model_v1", "metrics_file": "models/ai_text/metrics_v1.json"}}}
+}

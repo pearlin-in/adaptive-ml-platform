@@ -1,4 +1,16 @@
 {
   "accuracy": 0.9208333333333333,
-  "macro_f1": 0.9164496479428733
+  "macro_f1": 0.9164496479428733,
+  "class_names": [
+    "AnnualCrop",
+    "Forest",
+    "HerbaceousVegetation",
+    "Highway",
+    "Industrial",
+    "Pasture",
+    "PermanentCrop",
+    "Residential",
+    "River",
+    "SeaLake"
+  ]
 }

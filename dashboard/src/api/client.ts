@@ -16,6 +16,14 @@ export const api = {
     apiFetch<import("./types").DriftStatus | { status: "insufficient_data" }>(
       `/drift/${modelId}?version=${version}`
     ),
+  getDriftHistory: (modelId: string, version = "v1", limit = 100) =>
+    apiFetch<import("./types").DriftHistoryPoint[]>(
+      `/drift/${modelId}/history?version=${version}&limit=${limit}`
+    ),
+  getLatencyTimeseries: (modelId: string, version = "v1", limit = 60) =>
+    apiFetch<import("./types").LatencyPoint[]>(
+      `/stats/${modelId}/timeseries?version=${version}&limit=${limit}`
+    ),
   getIncidents: (limit = 50) =>
     apiFetch<import("./types").Incident[]>(`/incidents?limit=${limit}`),
 };

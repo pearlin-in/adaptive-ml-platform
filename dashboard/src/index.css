@@ -1,3 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --color-ink: #12151A;
+  --color-canvas: #F3F4F1;
+  --color-surface: #FFFFFF;
+  --color-line: #D7D9D4;
+  --color-muted: #6B7268;
+  --color-stable: #2F6F5E;
+  --color-stable-soft: #E4EEEB;
+  --color-canary: #A67C2E;
+  --color-canary-soft: #F3E9D6;
+  --color-alert: #B23A2E;
+  --color-alert-soft: #F5E1DE;
+
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}

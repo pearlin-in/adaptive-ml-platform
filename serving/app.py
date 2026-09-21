@@ -269,6 +269,31 @@ async def get_drift(model_id: str, version: str = "v1"):
             "current_samples": len(drift_monitor.buffers[(model_id, version)]),
         }
     return latest
+@app.get("/drift/{model_id}/history")
+async def get_drift_history(model_id: str, version: str = "v1", limit: int = 100):
+    conn = sqlite3.connect("serving/predictions.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT timestamp, metric_value as score, breached_threshold as breached "
+        "FROM drift_scores WHERE model_id = ? AND version = ? "
+        "ORDER BY timestamp DESC LIMIT ?",
+        (model_id, version, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]  # chronological for charting
+
+@app.get("/stats/{model_id}/timeseries")
+async def get_latency_timeseries(model_id: str, version: str = "v1", limit: int = 100):
+    conn = sqlite3.connect("serving/predictions.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT timestamp, latency_ms FROM predictions "
+        "WHERE model_id = ? AND version = ? AND error IS NULL "
+        "ORDER BY timestamp DESC LIMIT ?",
+        (model_id, version, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in reversed(rows)]
 
 @app.get("/incidents")
 async def get_incidents(model_id: str | None = None, limit: int = 50):

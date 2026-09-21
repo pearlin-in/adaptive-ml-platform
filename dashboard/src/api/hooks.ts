@@ -34,3 +34,18 @@ export function useIncidents() {
     refetchInterval: POLL_INTERVAL_MS,
   });
 }
+
+export function useDriftHistory(modelId: string, version = "v1") {
+  return useQuery({
+    queryKey: ["drift-history", modelId, version],
+    queryFn: () => api.getDriftHistory(modelId, version),
+    refetchInterval: POLL_INTERVAL_MS,
+  });
+}
+export function useLatencyTimeseries(modelId: string, version = "v1") {
+  return useQuery({
+    queryKey: ["latency-ts", modelId, version],
+    queryFn: () => api.getLatencyTimeseries(modelId, version),
+    refetchInterval: POLL_INTERVAL_MS,
+  });
+}

@@ -34,3 +34,22 @@ export interface Incident {
   previous_stable: string | null;
   timestamp: number;
 }
+
+export interface DriftHistoryPoint {
+  timestamp: number;
+  score: number;
+  breached: number;
+}
+export interface LatencyPoint {
+  timestamp: number;
+  latency_ms: number;
+}
+export interface Incident {
+  id: number;
+  model_id: string;
+  version: string;
+  action: "auto_rollback" | "canary_killed" | "breach_no_fallback";
+  reason: string;
+  previous_stable: string | null;
+  timestamp: number;
+}

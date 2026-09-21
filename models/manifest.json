@@ -1,0 +1,24 @@
+{
+  "fraud_detection": {
+    "active_version": "v1",
+    "versions": {
+      "v1": {
+        "path": "models/fraud_v1.pkl",
+        "created_at": "2026-01-01T00:00:00Z"
+      },
+      "v2": {
+        "path": "models/fraud_v2.pkl",
+        "created_at": "2026-01-02T00:00:00Z"
+      }
+    }
+  },
+  "recommendation": {
+    "active_version": "v1",
+    "versions": {
+      "v1": {
+        "path": "models/rec_v1.pkl",
+        "created_at": "2026-01-01T00:00:00Z"
+      }
+    }
+  }
+}

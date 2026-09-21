@@ -8,6 +8,7 @@ import uuid
 import asyncio
 
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile, Query
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from fastapi.responses import PlainTextResponse
 from PIL import Image
@@ -286,13 +287,21 @@ async def get_incidents(model_id: str | None = None, limit: int = 50):
 # ============================================================================
 # DASHBOARD TELEMETRY & REGISTRY ENDPOINTS (JSON)
 # ============================================================================
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows requests from Vite frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    )
+    
 @app.get("/registry")
 async def get_registry():
     """
     Dashboard-facing view of active model versions, available versions, 
     and canary routing state.
     """
+
     result = {}
     for model_id, manifest_entry in registry.manifest.items():
         routing_entry = router.config.get(model_id, {})

@@ -55,8 +55,9 @@ export function ModelPanel({ modelId, entry }: { modelId: string; entry: Registr
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2 my-4">
+        <div className="grid grid-cols-4 gap-2 my-4">
           <Stat label="p50" value={active?.p50} unit="ms" />
+          <Stat label="p95" value={active?.p95} unit="ms" />
           <Stat label="p99" value={active?.p99} unit="ms" />
           <Stat label="reqs" value={active?.requests_total} unit="" />
         </div>

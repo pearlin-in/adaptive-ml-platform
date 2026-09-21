@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { ModelPanel } from "@/components/registry/ModelPanel";
 import { IncidentTimeline } from "@/components/incidents/IncidentTimeline";
 import { RegistryTable } from "@/components/registry/RegistryTable";
+import { PerformancePanel } from "@/components/performance/PerformancePanel";
 
 export function Dashboard() {
   const { data: registry, isLoading, error } = useRegistry();
@@ -20,6 +21,7 @@ export function Dashboard() {
         </div>
         <IncidentTimeline />
         <RegistryTable />
+        <PerformancePanel />
       </main>
     </div>
   );

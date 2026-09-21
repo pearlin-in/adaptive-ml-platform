@@ -49,3 +49,10 @@ export function useLatencyTimeseries(modelId: string, version = "v1") {
     refetchInterval: POLL_INTERVAL_MS,
   });
 }
+export function usePercentileHistory(modelId: string, version = "v1") {
+  return useQuery({
+    queryKey: ["percentile-history", modelId, version],
+    queryFn: () => api.getPercentileHistory(modelId, version),
+    refetchInterval: POLL_INTERVAL_MS,
+  });
+}

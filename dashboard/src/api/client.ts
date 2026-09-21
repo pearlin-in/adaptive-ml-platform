@@ -25,5 +25,10 @@ export const api = {
       `/stats/${modelId}/timeseries?version=${version}&limit=${limit}`
     ),
   getIncidents: (limit = 50) =>
-    apiFetch<import("./types").Incident[]>(`/incidents?limit=${limit}`),
+    apiFetch<import("./types").Incident[]>(`/incidents?limit=${limit}`
+    ),
+  getPercentileHistory: (modelId: string, version = "v1", n_buckets = 20) =>
+  apiFetch<import("./types").PercentileBucket[]>(
+    `/stats/${modelId}/percentile_history?version=${version}&n_buckets=${n_buckets}`
+    ),
 };

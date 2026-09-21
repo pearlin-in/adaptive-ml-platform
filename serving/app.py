@@ -359,3 +359,37 @@ async def get_stats(model_id: str, version: Optional[str] = Query(default=None))
             **metrics_store.percentiles(model_id, v),
         }
     return out
+
+@app.get("/stats/{model_id}/percentile_history")
+async def get_percentile_history(model_id: str, version: str = "v1", n_buckets: int = 20, limit: int = 1000):
+    conn = sqlite3.connect("serving/predictions.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT timestamp, latency_ms, error FROM predictions "
+        "WHERE model_id = ? AND version = ? ORDER BY timestamp DESC LIMIT ?",
+        (model_id, version, limit),
+    ).fetchall()
+    conn.close()
+
+    rows = list(reversed(rows))
+    if not rows:
+        return []
+
+    bucket_size = max(1, len(rows) // n_buckets)
+    buckets = []
+    for i in range(0, len(rows), bucket_size):
+        chunk = rows[i : i + bucket_size]
+        latencies = sorted(r["latency_ms"] for r in chunk if r["error"] is None)
+        errors = sum(1 for r in chunk if r["error"] is not None)
+        if not latencies:
+            continue
+        def pct(p):
+            idx = min(int(len(latencies) * p), len(latencies) - 1)
+            return latencies[idx]
+        buckets.append({
+            "timestamp": chunk[-1]["timestamp"],
+            "p50": pct(0.50), "p95": pct(0.95), "p99": pct(0.99),
+            "error_rate": errors / len(chunk),
+            "count": len(chunk),
+        })
+    return buckets

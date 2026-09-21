@@ -53,3 +53,7 @@ export interface Incident {
   previous_stable: string | null;
   timestamp: number;
 }
+
+export interface PercentileBucket {
+  timestamp: number; p50: number; p95: number; p99: number; error_rate: number; count: number;
+}

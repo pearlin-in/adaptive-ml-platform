@@ -178,8 +178,8 @@ async def predict_satellite(
     model = registry.get("satellite", version)
     start = time.perf_counter()
     result, confidence, error = None, None, None
-
     image_bytes = await file.read()
+
     try:
         pil_img = Image.open(io.BytesIO(image_bytes))
         batcher = await get_batcher("satellite", version)
@@ -198,7 +198,9 @@ async def predict_satellite(
         }
     except Exception as e:
         error = str(e)
-        raise e
+        raise HTTPException(
+            status_code=422, detail=f"Invalid image file payload: {e}"
+        )from e
     finally:
         metrics_store.log_prediction(
             request_id=request_id,

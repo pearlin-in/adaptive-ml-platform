@@ -2,15 +2,17 @@
 import { useState } from "react";
 import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 import { usePercentileHistory } from "@/api/hooks";
+import type { RegistryResponse } from "@/api/types";
 
 const MODELS = ["fraud", "satellite", "ai_text"] as const;
 function formatTime(ts: number) {
   return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function PerformancePanel() {
+export function PerformancePanel({ registry }: { registry: RegistryResponse }) {
   const [activeModel, setActiveModel] = useState<(typeof MODELS)[number]>("fraud");
-  const { data } = usePercentileHistory(activeModel);
+  const activeVersion = registry[activeModel]?.active_version ?? "v1";
+  const { data } = usePercentileHistory(activeModel, activeVersion);
   const chartData = (data ?? []).map((b) => ({ ...b, time: formatTime(b.timestamp), error_pct: b.error_rate * 100 }));
 
   return (

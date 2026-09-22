@@ -1,11 +1,47 @@
 {
-  "fraud": {"active_version": "v1", "versions": {"v1": {
-    "path": "models/fraud", "metrics_file": "models/fraud/metrics_v1.json",
-    "reference_file": "models/fraud/reference_sample_v1.parquet"}}},
-  "satellite": {"active_version": "v1", "versions": {"v1": {
-    "path": "models/satellite", "metrics_file": "models/satellite/metrics_v1.json",
-    "reference_file": "models/satellite/reference_embeddings_v1.pt"}}},
-  "ai_text": {"active_version": "v1", "versions": {"v1": {
-    "path": "models/ai_text/model_v1", "metrics_file": "models/ai_text/metrics_v1.json",
-    "reference_file": "models/ai_text/reference_embeddings_v1.pt"}}}
+  "fraud": {
+    "active_version": "v1",
+    "versions": {
+      "v1": {
+        "path": "models/fraud",
+        "metrics_file": "models/fraud/metrics_v1.json",
+        "reference_file": "models/fraud/reference_sample_v1.parquet"
+      },
+      "v2": {
+        "path": "models/fraud",
+        "metrics_file": "models/fraud/metrics_v2.json",
+        "reference_file": "models/fraud/reference_sample_v2.parquet"
+      }
+    }
+  },
+  "satellite": {
+    "active_version": "v1",
+    "versions": {
+      "v1": {
+        "path": "models/satellite",
+        "metrics_file": "models/satellite/metrics_v1.json",
+        "reference_file": "models/satellite/reference_embeddings_v1.pt"
+      },
+      "v2": {
+        "path": "models/satellite",
+        "metrics_file": "models/satellite/metrics_v2.json",
+        "reference_file": "models/satellite/reference_embeddings_v2.pt"
+      }
+    }
+  },
+  "ai_text": {
+    "active_version": "v2",
+    "versions": {
+      "v1": {
+        "path": "models/ai_text/model_v1",
+        "metrics_file": "models/ai_text/metrics_v1.json",
+        "reference_file": "models/ai_text/reference_embeddings_v1.pt"
+      },
+      "v2": {
+        "path": "models/ai_text/model_v2",
+        "metrics_file": "models/ai_text/metrics_v2.json",
+        "reference_file": "models/ai_text/reference_embeddings_v2.pt"
+      }
+    }
+  }
 }

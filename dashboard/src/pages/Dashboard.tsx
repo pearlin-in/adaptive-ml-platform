@@ -19,9 +19,9 @@ export function Dashboard() {
             <ModelPanel key={modelId} modelId={modelId} entry={entry} />
           ))}
         </div>
-        <IncidentTimeline />
+        <IncidentTimeline registry={registry ?? {}} />
+        <PerformancePanel registry={registry ?? {}} />
         <RegistryTable />
-        <PerformancePanel />
       </main>
     </div>
   );

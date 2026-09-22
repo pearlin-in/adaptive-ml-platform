@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ReferenceDot, Tooltip, ResponsiveContainer } from "recharts";
 import { useDriftHistory, useIncidents } from "@/api/hooks";
+import type { RegistryResponse } from "@/api/types";
 
 const MODELS = ["fraud", "satellite", "ai_text"] as const;
 const THRESHOLDS: Record<string, number> = { fraud: 0.25, satellite: 0.15, ai_text: 0.15 };
@@ -9,9 +10,10 @@ function formatTime(ts: number) {
   return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function IncidentTimeline() {
+export function IncidentTimeline({ registry }: { registry: RegistryResponse }) {
   const [activeModel, setActiveModel] = useState<(typeof MODELS)[number]>("fraud");
-  const { data: history } = useDriftHistory(activeModel);
+  const activeVersion = registry[activeModel]?.active_version ?? "v1";
+  const { data: history } = useDriftHistory(activeModel, activeVersion);
   const { data: incidents } = useIncidents();
 
   const modelIncidents = (incidents ?? []).filter((i) => i.model_id === activeModel);

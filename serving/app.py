@@ -37,14 +37,14 @@ async def lifespan(app: FastAPI):
     await metrics_store.start()
 
     # Load manifest and register drift reference datasets
-    with open("models/manifest.json", "r") as f:
-        manifest = json.load(f)
-
-    for model_id in ("fraud", "satellite", "ai_text"):
-        if model_id in manifest:
-            active_v = manifest[model_id]["active_version"]
-            ref_file = manifest[model_id]["versions"][active_v]["reference_file"]
-            drift_monitor.register_reference(model_id, active_v, ref_file)
+    # Register references directly from the registry's in-memory manifest
+    for model_id, model_manifest in registry.manifest.items():
+        active_v = model_manifest.get("active_version")
+        if active_v and active_v in model_manifest.get("versions", {}):
+            ref_file = model_manifest["versions"][active_v].get("reference_file")
+            if ref_file:
+                drift_monitor.register_reference(model_id, active_v, ref_file)
+                print(f"Registered reference for ('{model_id}', '{active_v}') from {ref_file}")
 
     await drift_monitor.start()
 
@@ -298,16 +298,22 @@ async def get_latency_timeseries(model_id: str, version: str = "v1", limit: int 
     return [dict(r) for r in reversed(rows)]
 
 @app.get("/incidents")
-async def get_incidents(model_id: str | None = None, limit: int = 50):
+async def get_incidents(model_id: str | None = None, since: float | None = None, limit: int = 50):
     conn = sqlite3.connect("serving/predictions.db")
     conn.row_factory = sqlite3.Row
     query = "SELECT * FROM incidents"
-    params = ()
+    conditions, params = [], []
     if model_id:
-        query += " WHERE model_id = ?"
-        params = (model_id,)
+        conditions.append("model_id = ?")
+        params.append(model_id)
+    if since:
+        conditions.append("timestamp > ?")
+        params.append(since)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY timestamp DESC LIMIT ?"
-    rows = conn.execute(query, params + (limit,)).fetchall()
+    params.append(limit)
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -395,3 +401,15 @@ async def get_percentile_history(model_id: str, version: str = "v1", n_buckets: 
             "count": len(chunk),
         })
     return buckets
+
+@app.get("/debug/drift_internal/{model_id}")
+async def debug_drift_internal(model_id: str, version: str = "v2"):
+    key = (model_id, version)
+    return {
+        "buffer_len": len(drift_monitor.buffers.get(key, [])),
+        "has_reference_registered": key in drift_monitor.references,
+        "has_computed_a_score_yet": key in drift_monitor.latest_scores,
+        "background_task_running": drift_monitor._task is not None and not drift_monitor._task.done(),
+        "all_registered_reference_keys": list(drift_monitor.references.keys()),
+        "all_buffer_keys_with_data": {str(k): len(v) for k, v in drift_monitor.buffers.items()},
+    }

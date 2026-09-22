@@ -3,13 +3,15 @@ import httpx
 from datasets import load_dataset
 from scripts.demo_utils import BASE_URL, sustained_send, watch_for_breach_and_rollback
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 print("Loading a small HC3 sample for realistic baseline traffic...")
 
 _hc3 = load_dataset(
-    "parquet",
-    data_files={"train": "hf://datasets/hello-simpleai/hc3/all/*.parquet"},
-)["train"]
+    "json",
+    data_files="https://huggingface.co/datasets/hello-simpleai/hc3/resolve/main/all.jsonl",
+    split="train",
+)
 _baseline_texts = []
 for row in _hc3.select(range(200)):
     _baseline_texts += [a for a in row["human_answers"] if a.strip()]
@@ -18,14 +20,8 @@ for row in _hc3.select(range(200)):
 def baseline_text() -> str:
     return random.choice(_baseline_texts)
 
-# --- Current-generation LLM text: the real generalization-drift test -------
-# This is the honest test: text from a model the detector never saw during
-# training on 2022-era HC3 data. Wire whichever free-tier provider you have
-# (Groq's free tier, a free HF Inference endpoint, or a local Ollama model
-# all work at zero cost). Falls back to hand-written samples otherwise —
-# weaker evidence, say so explicitly if you use the fallback in your writeup.
 load_dotenv()
-CURRENT_LLM_API_KEY = os.environ.get("CURRENT_LLM_API_KEY")
+CURRENT_LLM_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("CURRENT_LLM_API_KEY")
 
 _FALLBACK_CURRENT_GEN_SAMPLES = [
     "That's a fair point, worth unpacking a little. The data suggests X, but "
@@ -39,20 +35,23 @@ _FALLBACK_CURRENT_GEN_SAMPLES = [
 ]
 
 async def generate_current_llm_text() -> str:
-    """
-    Example wiring (Groq, OpenAI-compatible client):
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=CURRENT_LLM_API_KEY, base_url="https://api.groq.com/openai/v1")
+    if not CURRENT_LLM_API_KEY:
+        print("[Warning] No API key found in .env, using fallback sample.")
+        return random.choice(_FALLBACK_CURRENT_GEN_SAMPLES)
+    try:
+        client = AsyncOpenAI(
+            api_key=CURRENT_LLM_API_KEY, 
+            base_url="https://api.groq.com/openai/v1"
+        )
         resp = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": "Write a short opinion on remote work."}],
         )
-        return resp.choices[0].message.content
-    """
-    if not CURRENT_LLM_API_KEY:
+        return resp.choices[0].message.content or random.choice(_FALLBACK_CURRENT_GEN_SAMPLES)
+    except Exception as e:
+        print(f"[Groq API Error] {e} — falling back to sample text.")
         return random.choice(_FALLBACK_CURRENT_GEN_SAMPLES)
-    raise NotImplementedError("Wire your chosen provider's API call here.")
-
+    
 async def main():
     async with httpx.AsyncClient(timeout=15.0) as client:
         async def send_baseline():

@@ -30,7 +30,7 @@ _FALLBACK_CURRENT_GEN_SAMPLES = [
     "If correctness matters more here, the extra complexity is worth it.",
 ]
 
-async def build_current_gen_pool(n: int = 15, delay_s: float = 2.1) -> list[str]:
+async def build_current_gen_pool(n: int = 30, delay_s: float = 2.1) -> list[str]:
     """Generates n samples sequentially, respecting Groq's 30 RPM limit (~1 per 2.1s)."""
     if not CURRENT_LLM_API_KEY:
         print("No API key found — pool will use default fallback samples.")
@@ -42,6 +42,11 @@ async def build_current_gen_pool(n: int = 15, delay_s: float = 2.1) -> list[str]
         "Share a quick thought on the four-day work week.",
         "What's your view on social media's effect on attention spans?",
         "Briefly weigh in on whether college is still worth it.",
+        "Explain how photosynthesis works in two sentences.",
+        "Write a short product review for a pair of running shoes.",
+        "Give step-by-step instructions for changing a bike tire.",
+        "Write a brief, encouraging message to someone starting a new job.",
+        "Summarize the plot of a mystery novel in three sentences.",
     ]
     pool = []
     http_client = httpx.AsyncClient(verify=certifi.where())
@@ -87,7 +92,7 @@ async def main():
             print("\n[Warning] Drift calculation endpoint timed out — proceeding to Phase 2.")
 
         print("\nPre-generating current-gen LLM text pool (respecting API rate limits)...")
-        current_gen_pool = await build_current_gen_pool(n=15)
+        current_gen_pool = await build_current_gen_pool(n=30)
         print(f"Pool ready: {len(current_gen_pool)} samples compiled.")
 
         async def send_shifted():

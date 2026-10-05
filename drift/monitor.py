@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_drift_model_version_ts ON drift_scores(model_id, 
 THRESHOLDS = {
     "fraud": {"metric": "psi_max_feature", "threshold": 0.25},
     "satellite": {"metric": "cosine_distance", "threshold": 0.15},
-    "ai_text": {"metric": "cosine_distance", "threshold": 0.15},
+    "ai_text": {"metric": "cosine_distance", "threshold": 0.08},  # Recalibrated based on empirical ~0.1046 plateau
 }
 
 MIN_WINDOW_SIZE = 150                

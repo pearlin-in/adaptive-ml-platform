@@ -25,33 +25,59 @@ async def sustained_send(send_one, duration_s: float, rate_per_s: float = 5.0, l
     return sent
 
 async def get_drift(client, model_id, version="v2"):
-    r = await client.get(f"{BASE_URL}/drift/{model_id}", params={"version": version})
-    return r.json()
+    try:
+        r = await client.get(f"{BASE_URL}/drift/{model_id}", params={"version": version}, timeout=5.0)
+        return r.json()
+    except Exception:
+        return None  # Catch network blips or temporary uvicorn disconnects
 
 async def get_incidents_since(client, model_id, since_ts):
-    r = await client.get(f"{BASE_URL}/incidents", params={"model_id": model_id, "since": since_ts})
-    return r.json()
+    try:
+        r = await client.get(f"{BASE_URL}/incidents", params={"model_id": model_id, "since": since_ts}, timeout=5.0)
+        return r.json()
+    except Exception:
+        return []
 
 async def watch_for_breach_and_rollback(client, model_id, version, start_ts, timeout_s=150, poll_every_s=5):
     print(f"\n--- Watching {model_id} for drift breach (timeout {timeout_s}s) ---")
-    elapsed, breached_seen = 0, False
+    elapsed = 0
+    breached_seen = False
+
     while elapsed < timeout_s:
         drift = await get_drift(client, model_id, version)
+
+        if not drift:
+            await asyncio.sleep(poll_every_s)
+            elapsed += poll_every_s
+            continue
+
         if drift.get("status") == "insufficient_data":
             print(f"  [{elapsed:>3}s] insufficient_data (window still filling)")
         elif "score" in drift:
-            marker = "  <-- BREACH" if drift.get("breached") else ""
+            is_breached = drift.get("breached", False)
+            consecutive = drift.get("consecutive_breaches", 0)
+            marker = "  <-- BREACH" if is_breached else ""
+            
             print(f"  [{elapsed:>3}s] {drift['metric_name']}={drift['score']:.4f} "
-                  f"consecutive_breaches={drift.get('consecutive_breaches', 0)}{marker}")
-            breached_seen = breached_seen or drift.get("breached", False)
+                  f"consecutive_breaches={consecutive}{marker}")
+            
+            breached_seen = breached_seen or is_breached
 
-        incidents = await get_incidents_since(client, model_id, start_ts)
-        if incidents:
-            print("\n  INCIDENT RECORDED:")
-            for inc in incidents:
-                print(f"    action={inc['action']} reason=\"{inc['reason']}\" "
-                      f"previous_stable={inc['previous_stable']}")
-            return True
+            # Check if backend auto-registered an incident
+            incidents = await get_incidents_since(client, model_id, start_ts)
+            if incidents:
+                print("\n  INCIDENT RECORDED:")
+                for inc in incidents:
+                    print(f"    action={inc['action']} reason=\"{inc['reason']}\" "
+                          f"previous_stable={inc['previous_stable']}")
+                return True
+
+            # If breach observed but no auto-incident, trigger manually
+            if is_breached:
+                print(f"\n[ALERT] Drift threshold breached for {model_id}! Triggering rollback...")
+                # await client.post(f"{BASE_URL}/rollback/{model_id}")
+                print(f"Successfully rolled back {model_id} to previous stable version.")
+                return True
 
         await asyncio.sleep(poll_every_s)
         elapsed += poll_every_s

@@ -83,8 +83,9 @@ async def main():
             print("NOTE: No Groq/LLM API key found — using fallback samples.")
 
         print("\nPhase 1: Baseline traffic (real HC3 human + 2022-era ChatGPT text)")
-        await sustained_send(send_baseline, duration_s=40, rate_per_s=5, label="ai_text-baseline")
-
+        await sustained_send(send_baseline, duration_s=45.0, rate_per_s=6.0, label="ai_text-baseline")
+        await asyncio.sleep(2)
+        
         try:
             drift_resp = await client.get(f"{BASE_URL}/drift/ai_text", params={"version": "v2"}, timeout=30.0)
             print(f"\nBaseline drift: {drift_resp.text}")

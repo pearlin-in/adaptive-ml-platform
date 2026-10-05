@@ -10,7 +10,7 @@
     "canary_percent": 0
   },
   "ai_text": {
-    "stable": "v2",
+    "stable": "v1",
     "canary": null,
     "canary_percent": 0
   }

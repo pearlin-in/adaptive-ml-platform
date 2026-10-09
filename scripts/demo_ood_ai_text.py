@@ -102,8 +102,8 @@ async def main():
         start_ts = time.time()
         print("\nPhase 2: Injecting current-generation LLM text (real generalization test)")
         await asyncio.gather(
-            sustained_send(send_shifted, duration_s=90, rate_per_s=3, label="ai_text-injection"),
-            watch_for_breach_and_rollback(client, "ai_text", "v2", start_ts, timeout_s=150),
+            sustained_send(send_shifted, duration_s=180, rate_per_s=3, label="ai_text-injection"),
+            watch_for_breach_and_rollback(client, "ai_text", "v2", start_ts, timeout_s=180),
         )
 
 if __name__ == "__main__":

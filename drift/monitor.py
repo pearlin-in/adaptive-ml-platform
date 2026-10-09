@@ -44,7 +44,7 @@ class DriftMonitor:
         self.db_path = db_path
         self.recompute_interval_s = recompute_interval_s
         self.window_size = window_size
-
+        self.samples_since_compute: dict[tuple[str, str], int] = defaultdict(int)
         self.references: dict[tuple[str, str], ReferenceData] = {}
         self.buffers: dict[tuple[str, str], deque] = defaultdict(lambda: deque(maxlen=window_size))
         self.consecutive_breaches: dict[tuple[str, str], int] = defaultdict(int)
@@ -71,10 +71,11 @@ class DriftMonitor:
         key = (model_id, version)
         self.buffers[key].append(vector)
         self.samples_since_compute[key] += 1
+        self._recompute_all()
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
-
+    
     async def stop(self):
         if self._task:
             self._task.cancel()

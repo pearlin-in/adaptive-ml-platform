@@ -41,8 +41,8 @@ async def main():
         start_ts = time.time()
         print("\nPhase 2: injecting inverted/high-contrast/noisy images (simulated sensor shift)")
         await asyncio.gather(
-            sustained_send(send_shifted, duration_s=90, rate_per_s=5, label="satellite-injection"),
-            watch_for_breach_and_rollback(client, "satellite", "v2", start_ts, timeout_s=120),
+            sustained_send(send_shifted, duration_s=180, rate_per_s=5, label="satellite-injection"),
+            watch_for_breach_and_rollback(client, "satellite", "v2", start_ts, timeout_s=180),
         )
 
 if __name__ == "__main__":

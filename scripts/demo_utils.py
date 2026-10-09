@@ -74,10 +74,8 @@ async def watch_for_breach_and_rollback(client, model_id, version, start_ts, tim
 
             # If breach observed but no auto-incident, trigger manually
             if is_breached:
-                print(f"\n[ALERT] Drift threshold breached for {model_id}! Triggering rollback...")
-                # await client.post(f"{BASE_URL}/rollback/{model_id}")
-                print(f"Successfully rolled back {model_id} to previous stable version.")
-                return True
+                 print(f"  [{elapsed}s] breach detected (consecutive={consecutive}) — "
+                       f"waiting for backend to reach {3} consecutive breaches...")
 
         await asyncio.sleep(poll_every_s)
         elapsed += poll_every_s

@@ -30,7 +30,7 @@
     }
   },
   "ai_text": {
-    "active_version": "v2",
+    "active_version": "v1",
     "versions": {
       "v1": {
         "path": "models/ai_text/model_v1",

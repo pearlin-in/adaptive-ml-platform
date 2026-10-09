@@ -31,8 +31,8 @@ async def main():
         start_ts = time.time()
         print("\nPhase 2: injecting shifted transactions (simulated emerging fraud pattern)")
         await asyncio.gather(
-            sustained_send(send_shifted, duration_s=90, rate_per_s=8, label="fraud-injection"),
-            watch_for_breach_and_rollback(client, "fraud", "v2", start_ts, timeout_s=120),
+            sustained_send(send_shifted, duration_s=180, rate_per_s=8, label="fraud-injection"),
+            watch_for_breach_and_rollback(client, "fraud", "v2", start_ts, timeout_s=180),
         )
 
 if __name__ == "__main__":

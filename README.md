@@ -7,3 +7,4 @@ things i got to do:
 - implement the circuit breaker fallback response 
 - before/after demo
 - deploy/doc
+- Compare your drift detector against real libraries 

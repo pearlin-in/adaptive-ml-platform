@@ -1,6 +1,6 @@
 {
   "fraud": {
-    "active_version": "v1",
+    "active_version": "v2",
     "versions": {
       "v1": {
         "path": "models/fraud",
@@ -15,7 +15,7 @@
     }
   },
   "satellite": {
-    "active_version": "v1",
+    "active_version": "v2",
     "versions": {
       "v1": {
         "path": "models/satellite",
@@ -30,7 +30,7 @@
     }
   },
   "ai_text": {
-    "active_version": "v1",
+    "active_version": "v2",
     "versions": {
       "v1": {
         "path": "models/ai_text/model_v1",

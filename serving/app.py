@@ -6,6 +6,7 @@ import sqlite3
 import time
 import uuid
 import asyncio
+import os
 
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,12 +40,13 @@ async def lifespan(app: FastAPI):
     # Load manifest and register drift reference datasets
     # Register references directly from the registry's in-memory manifest
     for model_id, model_manifest in registry.manifest.items():
-        active_v = model_manifest.get("active_version")
-        if active_v and active_v in model_manifest.get("versions", {}):
-            ref_file = model_manifest["versions"][active_v].get("reference_file")
-            if ref_file:
-                drift_monitor.register_reference(model_id, active_v, ref_file)
-                print(f"Registered reference for ('{model_id}', '{active_v}') from {ref_file}")
+        for version, vcfg in model_manifest.get("versions", {}).items():
+            ref_file = vcfg.get("reference_file")
+            if ref_file and os.path.exists(ref_file):
+                drift_monitor.register_reference(model_id, version, ref_file)
+                print(f"Registered reference for ('{model_id}', '{version}') from {ref_file}")
+            else:
+                print(f"WARNING: no reference file for ('{model_id}', '{version}')")
 
     await drift_monitor.start()
 

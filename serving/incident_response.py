@@ -49,50 +49,39 @@ class IncidentResponder:
         conn.close()
 
     def handle_breach(self, model_id: str, version: str, score: dict):
-        """
-        This is the callback registered with drift_monitor.on_breach(...).
-        Called synchronously from DriftMonitor's executor thread — keep it fast,
-        no blocking I/O beyond the sqlite write above.
-        """
         cfg = self.router.config[model_id]
         current_stable = cfg["stable"]
+        current_canary = cfg.get("canary")
 
-        if version != current_stable:
-            # Drift on a canary — cheapest response: just kill the canary, no rollback needed.
-            logger.warning(
-                "DRIFT BREACH: %s canary v%s (%s=%.4f) — pulling canary traffic, stable v%s unaffected",
-                model_id, version, score["metric_name"], score["score"], current_stable,
-            )
-            self.router.config[model_id]["canary"] = None
-            self.router.config[model_id]["canary_percent"] = 0
+        if version == current_canary:
+            logger.warning("DRIFT BREACH on %s canary %s — pulling canary", model_id, version)
+            cfg["canary"] = None
+            cfg["canary_percent"] = 0
             self.router._save()
             self._log_incident(model_id, version, "canary_killed",
-                                f"{score['metric_name']} breached for {score['consecutive_breaches']} consecutive windows",
-                                score, current_stable)
+                            f"{score['metric_name']} breached for {score['consecutive_breaches']} consecutive windows",
+                            score, current_stable)
             return
 
-        # Drift on the stable/active version — this is the real incident.
+        if version != current_stable:
+            logger.info("Ignoring drift on %s %s: not stable or canary (already retired)", model_id, version)
+            return
+
         previous_version = self._find_previous_version(model_id, version)
         if previous_version is None:
-            logger.error(
-                "DRIFT BREACH on %s stable v%s with no previous version to roll back to — "
-                "serving degraded traffic, manual intervention required",
-                model_id, version,
-            )
+            logger.error("DRIFT BREACH on %s stable %s with no previous version to roll back to", model_id, version)
             self._log_incident(model_id, version, "breach_no_fallback",
-                                f"{score['metric_name']} breached, no prior version available",
-                                score, current_stable)
+                            f"{score['metric_name']} breached, no prior version available",
+                            score, current_stable)
             return
 
-        logger.error(
-            "DRIFT BREACH: %s stable v%s (%s=%.4f) — auto-rolling back to v%s",
-            model_id, version, score["metric_name"], score["score"], previous_version,
-        )
+        logger.error("DRIFT BREACH: %s stable %s (%s=%.4f) — auto-rolling back to %s",
+                    model_id, version, score["metric_name"], score["score"], previous_version)
         self.router.set_active_stable(model_id, previous_version)
         self.registry.set_active(model_id, previous_version)
         self._log_incident(model_id, version, "auto_rollback",
-                            f"{score['metric_name']} breached for {score['consecutive_breaches']} consecutive windows",
-                            score, previous_version)
+                        f"{score['metric_name']} breached for {score['consecutive_breaches']} consecutive windows",
+                        score, previous_version)
 
     def _find_previous_version(self, model_id: str, current_version: str) -> str | None:
         versions = sorted(self.registry.manifest[model_id]["versions"].keys())

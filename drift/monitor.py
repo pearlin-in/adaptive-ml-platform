@@ -35,6 +35,7 @@ THRESHOLDS = {
 }
 
 MIN_WINDOW_SIZE = 150                
+MIN_NEW_SAMPLES_PER_WINDOW = 50
 CONSECUTIVE_BREACHES_TO_ALERT = 3     # Phase 7's rollback subscribes to this
 
 
@@ -67,8 +68,9 @@ class DriftMonitor:
         self._on_breach_callbacks.append(callback)
 
     def record_sample(self, model_id: str, version: str, vector: np.ndarray):
-        """Call after every prediction with model.embed(raw_input)."""
-        self.buffers[(model_id, version)].append(vector)
+        key = (model_id, version)
+        self.buffers[key].append(vector)
+        self.samples_since_compute[key] += 1
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
@@ -91,11 +93,14 @@ class DriftMonitor:
         for key, buffer in list(self.buffers.items()):
             if len(buffer) < MIN_WINDOW_SIZE:
                 continue
+            if self.samples_since_compute[key] < MIN_NEW_SAMPLES_PER_WINDOW:
+                continue  # no fresh traffic: re-scoring old data isn't a new window
             model_id, version = key
             ref = self.references.get(key)
             if ref is None:
                 logger.warning("No reference registered for %s — skipping", key)
                 continue
+            self.samples_since_compute[key] = 0
             try:
                 self._compute_and_store(model_id, version, ref, list(buffer))
             except Exception:
@@ -147,6 +152,10 @@ class DriftMonitor:
         if self.consecutive_breaches[key] >= CONSECUTIVE_BREACHES_TO_ALERT:
             for cb in self._on_breach_callbacks:
                 cb(model_id, version, self.latest_scores[key])
+            # The action consumed this evidence; start the next episode from scratch.
+            self.buffers[key].clear()
+            self.consecutive_breaches[key] = 0
+            self.samples_since_compute[key] = 0
 
     def get_latest(self, model_id: str, version: str) -> dict | None:
         return self.latest_scores.get((model_id, version))

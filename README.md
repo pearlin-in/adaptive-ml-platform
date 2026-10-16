@@ -4,8 +4,6 @@ Serve ML models, watch for drift, and roll back automatically.
 
 A model-agnostic serving platform built with FastAPI and React. It runs three deliberately different models (tabular fraud detection, satellite image classification, and AI-generated-text detection) behind one backend, monitors the data each model receives, and when drift is sustained it rolls traffic back to the last stable version and records an incident.
 
-![Dashboard overview](docs/images/dashboard-overview.png)
-
 ## Why this exists
 
 Training a model is the easy part. The harder part is what happens after deployment: how requests are batched, how new versions are rolled out, how you notice that live inputs no longer look like the training data, and what the system does about it. This project builds that layer end to end and tests it with injected drift on three different data types.

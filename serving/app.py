@@ -15,7 +15,7 @@ from fastapi.responses import PlainTextResponse
 from PIL import Image
 from pydantic import BaseModel
 
-from drift.monitor import DriftMonitor, MIN_WINDOW_SIZE
+from drift.monitor import DriftMonitor, MIN_WINDOW_SIZE, THRESHOLDS
 from serving.batcher import MicroBatcher
 from serving.metrics_store import MetricsStore
 from serving.registry.registry import ModelRegistry
@@ -30,6 +30,7 @@ drift_monitor = DriftMonitor(db_path="serving/predictions.db")
 incident_responder = IncidentResponder(router=router, registry=registry, db_path="serving/predictions.db")
 drift_monitor.on_breach(incident_responder.handle_breach)
 batchers: dict[tuple[str, str], MicroBatcher] = {}
+DEMO_MODE = os.environ.get("DEMO_MODE") == "1"
 
 
 @asynccontextmanager
@@ -404,14 +405,26 @@ async def get_percentile_history(model_id: str, version: str = "v1", n_buckets: 
         })
     return buckets
 
-@app.get("/debug/drift_internal/{model_id}")
-async def debug_drift_internal(model_id: str, version: str = "v2"):
-    key = (model_id, version)
+@app.get("/health")
+async def health():
+    age = None if drift_monitor.last_loop_ok is None else time.time() - drift_monitor.last_loop_ok
     return {
-        "buffer_len": len(drift_monitor.buffers.get(key, [])),
-        "has_reference_registered": key in drift_monitor.references,
-        "has_computed_a_score_yet": key in drift_monitor.latest_scores,
-        "background_task_running": drift_monitor._task is not None and not drift_monitor._task.done(),
-        "all_registered_reference_keys": list(drift_monitor.references.keys()),
-        "all_buffer_keys_with_data": {str(k): len(v) for k, v in drift_monitor.buffers.items()},
+        "drift_loop_alive": drift_monitor._task is not None and not drift_monitor._task.done(),
+        "seconds_since_last_drift_loop": age,
     }
+
+# serving/app.py (also change the import to: from drift.monitor import DriftMonitor, MIN_WINDOW_SIZE, THRESHOLDS)
+@app.get("/thresholds")
+async def get_thresholds():
+    return {m: cfg["threshold"] for m, cfg in THRESHOLDS.items()}
+
+
+@app.post("/admin/reset_demo")
+async def reset_demo():
+    if not DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+    for model_id in registry.manifest:
+        registry.set_active(model_id, "v2")
+        router.set_active_stable(model_id, "v2")
+    drift_monitor.reset_state()
+    return {"status": "reset"}

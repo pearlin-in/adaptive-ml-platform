@@ -51,6 +51,7 @@ class DriftMonitor:
         self.latest_scores: dict[tuple[str, str], dict] = {}
         self._on_breach_callbacks = []
         self._task: asyncio.Task | None = None
+        self.last_loop_ok: float | None = None
         self._init_db()
 
     def _init_db(self):
@@ -58,6 +59,12 @@ class DriftMonitor:
         conn.executescript(DRIFT_SCHEMA)
         conn.commit()
         conn.close()
+
+    def reset_state(self):
+        self.buffers.clear()
+        self.consecutive_breaches.clear()
+        self.samples_since_compute.clear()
+        self.latest_scores.clear()
 
     def register_reference(self, model_id: str, version: str, reference_file: str):
         self.references[(model_id, version)] = ReferenceData(model_id, reference_file)
@@ -71,7 +78,6 @@ class DriftMonitor:
         key = (model_id, version)
         self.buffers[key].append(vector)
         self.samples_since_compute[key] += 1
-        self._recompute_all()
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
@@ -87,9 +93,12 @@ class DriftMonitor:
     async def _loop(self):
         while True:
             await asyncio.sleep(self.recompute_interval_s)
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self._recompute_all)
-
+            try:
+                await asyncio.get_running_loop().run_in_executor(None, self._recompute_all)
+                self.last_loop_ok = time.time()
+            except Exception:
+                logger.exception("Drift recompute failed; loop continues")
+                
     def _recompute_all(self):
         for key, buffer in list(self.buffers.items()):
             if len(buffer) < MIN_WINDOW_SIZE:

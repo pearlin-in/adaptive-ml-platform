@@ -1,0 +1,34 @@
+Loading a small EuroSAT sample for realistic baseline traffic...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+=== Satellite OOD Injection Demo ===
+
+Phase 1: baseline traffic (real EuroSAT images)
+  [satellite-baseline] sent 175 requests over 45s
+
+Baseline drift: <Response [200 OK]>
+
+Phase 2: injecting inverted/high-contrast/noisy images (simulated sensor shift)
+
+--- Watching satellite for drift breach (timeout 180s) ---
+  [  0s] insufficient_data (window still filling)
+  [  5s] cosine_distance=0.0199 consecutive_breaches=0
+  [ 10s] cosine_distance=0.0199 consecutive_breaches=0
+  [ 15s] cosine_distance=0.0199 consecutive_breaches=0
+  [ 20s] cosine_distance=0.0890 consecutive_breaches=0
+  [ 25s] cosine_distance=0.0890 consecutive_breaches=0
+  [ 30s] cosine_distance=0.0890 consecutive_breaches=0
+  [ 35s] cosine_distance=0.2581 consecutive_breaches=1  <-- BREACH
+  [35s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 40s] cosine_distance=0.2581 consecutive_breaches=1  <-- BREACH
+  [40s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 45s] cosine_distance=0.3947 consecutive_breaches=2  <-- BREACH
+  [45s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [ 50s] cosine_distance=0.3947 consecutive_breaches=2  <-- BREACH
+  [50s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [ 55s] cosine_distance=0.3947 consecutive_breaches=2  <-- BREACH
+  [55s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [ 60s] cosine_distance=0.3988 consecutive_breaches=3  <-- BREACH
+
+  INCIDENT RECORDED:
+    action=auto_rollback reason="cosine_distance breached for 3 consecutive windows" previous_stable=v1
+  [satellite-injection] sent 869 requests over 180s

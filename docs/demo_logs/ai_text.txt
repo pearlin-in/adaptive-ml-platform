@@ -1,0 +1,89 @@
+Loading a small HC3 sample for realistic baseline traffic...
+=== AI-Text-Detection OOD Injection Demo ===
+
+Phase 1: Baseline traffic (real HC3 human + 2022-era ChatGPT text)
+  [ai_text-baseline] sent 260 requests over 45s
+
+Baseline drift: {"metric_name":"cosine_distance","score":0.0008838176727294922,"breached":false,"consecutive_breaches":0,"detail":{"cosine_distance":0.0008838176727294922,"mean_similarity":0.6301997900009155,"std_similarity":0.44897302985191345},"timestamp":1792150845.9508567}
+
+Pre-generating current-gen LLM text pool (respecting API rate limits)...
+  Generated sample 1/30
+  Generated sample 2/30
+  Generated sample 3/30
+  Generated sample 4/30
+  Generated sample 5/30
+  Generated sample 6/30
+  Generated sample 7/30
+  Generated sample 8/30
+  Generated sample 9/30
+  Generated sample 10/30
+  Generated sample 11/30
+  Generated sample 12/30
+  Generated sample 13/30
+  Generated sample 14/30
+  Generated sample 15/30
+  Generated sample 16/30
+  Generated sample 17/30
+  Generated sample 18/30
+  Generated sample 19/30
+  Generated sample 20/30
+  Generated sample 21/30
+  Generated sample 22/30
+  Generated sample 23/30
+  Generated sample 24/30
+  Generated sample 25/30
+  Generated sample 26/30
+  Generated sample 27/30
+  Generated sample 28/30
+  Generated sample 29/30
+  Generated sample 30/30
+Pool ready: 30 samples compiled.
+
+Phase 2: Injecting current-generation LLM text (real generalization test)
+
+--- Watching ai_text for drift breach (timeout 180s) ---
+  [  0s] cosine_distance=0.0009 consecutive_breaches=0
+  [  5s] cosine_distance=0.0009 consecutive_breaches=0
+  [ 10s] cosine_distance=0.0009 consecutive_breaches=0
+  [ 15s] cosine_distance=0.0009 consecutive_breaches=0
+  [ 20s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 25s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 30s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 35s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 40s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 45s] cosine_distance=0.0071 consecutive_breaches=0
+  [ 50s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 55s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 60s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 65s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 70s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 75s] cosine_distance=0.0576 consecutive_breaches=0
+  [ 80s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [80s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 85s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [85s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 90s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [90s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 95s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [95s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [100s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [100s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [105s] cosine_distance=0.1013 consecutive_breaches=1  <-- BREACH
+  [105s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [110s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [110s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [115s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [115s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [120s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [120s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [125s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [125s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [130s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [130s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [135s] cosine_distance=0.1041 consecutive_breaches=2  <-- BREACH
+  [135s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [140s] cosine_distance=0.1039 consecutive_breaches=3  <-- BREACH
+
+  INCIDENT RECORDED:
+    action=auto_rollback reason="cosine_distance breached for 3 consecutive windows" previous_stable=v1
+  [ai_text-injection] sent 528 requests over 180s

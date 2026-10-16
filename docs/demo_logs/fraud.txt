@@ -1,0 +1,28 @@
+=== Fraud OOD Injection Demo ===
+
+Phase 1: baseline traffic (filling drift window, in-distribution)
+  [fraud-baseline] sent 230 requests over 40s
+
+Baseline drift: <Response [200 OK]>
+
+Phase 2: injecting shifted transactions (simulated emerging fraud pattern)
+
+--- Watching fraud for drift breach (timeout 180s) ---
+  [  0s] psi_max_feature=2.0654 consecutive_breaches=1  <-- BREACH
+  [0s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [  5s] psi_max_feature=2.0654 consecutive_breaches=1  <-- BREACH
+  [5s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 10s] psi_max_feature=2.0654 consecutive_breaches=1  <-- BREACH
+  [10s] breach detected (consecutive=1) — waiting for backend to reach 3 consecutive breaches...
+  [ 15s] psi_max_feature=2.7559 consecutive_breaches=2  <-- BREACH
+  [15s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [ 20s] psi_max_feature=2.7559 consecutive_breaches=2  <-- BREACH
+  [20s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [fraud-injection] request error (expected sometimes for OOD inputs): 
+  [ 25s] psi_max_feature=2.7559 consecutive_breaches=2  <-- BREACH
+  [25s] breach detected (consecutive=2) — waiting for backend to reach 3 consecutive breaches...
+  [ 30s] psi_max_feature=4.5589 consecutive_breaches=3  <-- BREACH
+
+  INCIDENT RECORDED:
+    action=auto_rollback reason="psi_max_feature breached for 3 consecutive windows" previous_stable=v1
+  [fraud-injection] sent 1346 requests over 180s

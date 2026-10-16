@@ -1,0 +1,38 @@
+[
+  {
+    "model": "fraud",
+    "signal": "PSI (max feature)",
+    "threshold": 0.25,
+    "peak_score": 4.558866250722076,
+    "auto_rollbacks": 1,
+    "other_incidents": 2,
+    "reason": "psi_max_feature breached for 3 consecutive windows",
+    "seconds_injection_to_rollback": 27.6,
+    "active_version_after": "v1",
+    "passed": true
+  },
+  {
+    "model": "satellite",
+    "signal": "cosine distance",
+    "threshold": 0.15,
+    "peak_score": 0.39876532554626465,
+    "auto_rollbacks": 1,
+    "other_incidents": 1,
+    "reason": "cosine_distance breached for 3 consecutive windows",
+    "seconds_injection_to_rollback": 61.3,
+    "active_version_after": "v1",
+    "passed": true
+  },
+  {
+    "model": "ai_text",
+    "signal": "cosine distance",
+    "threshold": 0.08,
+    "peak_score": 0.10414111614227295,
+    "auto_rollbacks": 1,
+    "other_incidents": 0,
+    "reason": "cosine_distance breached for 3 consecutive windows",
+    "seconds_injection_to_rollback": 138.0,
+    "active_version_after": "v1",
+    "passed": true
+  }
+]

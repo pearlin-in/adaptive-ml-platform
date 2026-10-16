@@ -10,6 +10,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 
 export const api = {
   getRegistry: () => apiFetch<import("./types").RegistryResponse>("/registry"),
+  getThresholds: () => apiFetch<Record<string, number>>("/thresholds"),
   getStats: (modelId: string) =>
     apiFetch<import("./types").StatsResponse>(`/stats/${modelId}`),
   getDrift: (modelId: string, version = "v1") =>

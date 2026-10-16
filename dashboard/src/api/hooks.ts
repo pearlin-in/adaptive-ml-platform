@@ -56,3 +56,7 @@ export function usePercentileHistory(modelId: string, version = "v1") {
     refetchInterval: POLL_INTERVAL_MS,
   });
 }
+
+export function useThresholds() {
+  return useQuery({ queryKey: ["thresholds"], queryFn: api.getThresholds, staleTime: Infinity });
+}

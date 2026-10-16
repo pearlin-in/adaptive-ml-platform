@@ -323,4 +323,3 @@ Problems found and fixed while building this, each caught by measurement rather 
 - EuroSAT (Helber et al.)
 - HC3, the Human ChatGPT Comparison Corpus (Guo et al.), CC-BY-SA 4.0
 
-See each dataset's page for full terms. Add a `LICENSE` file for the code (MIT is a common choice).

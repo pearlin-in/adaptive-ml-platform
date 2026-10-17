@@ -2,31 +2,33 @@
 scripts/compare_drift_detectors.py
 
 Evaluates drift detectors on the fraud model under controlled shifts and links each
-detector's output to the model's real performance loss (PR-AUC on the shifted data).
+detector's output to the model's real performance loss.
 
 Detectors compared (all see the same 200-row windows, in model space):
   - psi:           this project's max-per-feature PSI at the production threshold (0.25)
   - ks:            scipy two-sample KS per feature, Bonferroni-corrected at alpha=0.05
   - evid_any:      Evidently DataDriftPreset, "any column drifted"
-  - evid_dataset:  Evidently DataDriftPreset, its own dataset-level decision
-                   (default: drift only if >= 50% of columns drift)
+  - evid_dataset:  Evidently's own dataset-level decision (default: >= 50% of columns drifted)
 
 Shift scenarios:
-  - none:                     no shift (measures false-positive rate)
-  - top_features:             shift the 3 most important V features by `severity` std devs
-  - low_importance_features:  shift the 8 least important V features by `severity` std devs
+  - none:                     no shift (measures the false-positive rate)
+  - top_features:             shift the 3 most important V features (by GAIN) by `severity` std devs
+  - low_importance_features:  shift the 8 least important V features (by GAIN) by `severity` std devs
   - amount_scale:             multiply raw Amount by (1 + severity)
 
-The question this answers: does a drift alarm actually track performance loss? Shifting
-features the model barely uses should trigger drift detectors without hurting PR-AUC.
+Performance loss is the PR-AUC drop on the full shifted validation set, with a paired
+bootstrap 95% interval (the same resampled rows are used for the unshifted and shifted
+scores), because the validation split has under 100 fraud positives and raw PR-AUC is noisy.
 
 Usage (project root, venv active):
-    pip install evidently scipy
+    pip install scipy
+    pip install "evidently<0.5"      # optional; the script skips Evidently if unavailable
     python -m scripts.compare_drift_detectors
 
-The Evidently code uses the classic API (evidently.report.Report). If the import fails on
-a newer release, run: pip install "evidently<0.5"   (the script skips Evidently otherwise).
+The Evidently code uses the classic API (evidently.report.Report, evidently.metric_preset).
+Releases that dropped it are skipped with a message.
 """
+import json
 import warnings
 
 import joblib
@@ -43,8 +45,9 @@ warnings.filterwarnings("ignore")
 
 RNG = np.random.default_rng(0)
 WINDOW = 200
-N_TRIALS = 30              # windows per condition for PSI and KS
-N_TRIALS_EVIDENTLY = 8     # Evidently is slower, so fewer windows
+N_TRIALS = 200             # windows per condition for PSI and KS
+N_TRIALS_EVIDENTLY = 10    # Evidently is slower, so fewer windows
+N_BOOT = 100               # bootstrap resamples for the PR-AUC drop interval
 PSI_THRESHOLD = 0.25
 ALPHA = 0.05
 SEVERITIES = [0.5, 1, 2, 4]
@@ -54,6 +57,7 @@ df = pd.read_csv("data/raw/creditcard.csv")
 X, y = df.drop(columns=["Class"]), df["Class"]
 # Same split as the training notebook (stratified, random_state=42)
 _, X_val_raw, _, y_val = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+y_arr = y_val.to_numpy()
 
 model = joblib.load("models/fraud/model_v1.joblib")
 scaler = joblib.load("models/fraud/scaler_v1.joblib")
@@ -74,17 +78,16 @@ def to_model_space(X_raw: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- shift scenarios
-try:
-    names = list(model.feature_name_)
-except AttributeError:
-    names = cols
-importances = pd.Series(model.feature_importances_, index=names)
+# Gain importance reflects how much each feature improves the model's loss. The default
+# split-count importance is a poor proxy: it can rank genuinely informative features low.
+booster = model.booster_
+importances = pd.Series(booster.feature_importance(importance_type="gain"), index=booster.feature_name())
 v_cols = [c for c in cols if c.startswith("V")]
 top3 = list(importances[v_cols].nlargest(3).index)
 bottom8 = list(importances[v_cols].nsmallest(8).index)
 std = X_val_raw.std()
-print(f"top-3 important features: {top3}")
-print(f"8 least important features: {bottom8}")
+print(f"top-3 features by gain: {top3}")
+print(f"8 least important features by gain: {bottom8}")
 
 
 def apply_shift(X_raw: pd.DataFrame, kind: str, severity: float) -> pd.DataFrame:
@@ -143,14 +146,33 @@ def evidently_detect(w: pd.DataFrame):
 # ---------------------------------------------------------------- experiment
 conditions = [("none", 0)] + [(k, s) for k in ("top_features", "low_importance_features", "amount_scale")
                               for s in SEVERITIES]
+boot_idx = [RNG.integers(0, len(y_arr), len(y_arr)) for _ in range(N_BOOT)]
 rows = []
-baseline_pr_auc = None
+baseline_pr_auc, base_scores, base_boot = None, None, None
 
 for kind, sev in conditions:
     shifted = to_model_space(apply_shift(X_val_raw, kind, sev))
-    pr_auc = average_precision_score(y_val, model.predict_proba(shifted)[:, 1])
-    if baseline_pr_auc is None:
-        baseline_pr_auc = pr_auc
+    scores = model.predict_proba(shifted)[:, 1]
+    pr_auc = average_precision_score(y_arr, scores)
+
+    if base_scores is None:
+        baseline_pr_auc, base_scores = pr_auc, scores
+        base_boot = np.array([average_precision_score(y_arr[i], base_scores[i]) for i in boot_idx])
+        try:
+            with open("models/fraud/metrics_v1.json") as f:
+                trained = json.load(f)
+            trained_pr = trained.get("pr_auc")
+        except Exception:
+            trained_pr = None
+        print(f"\nSANITY CHECK: PR-AUC on the unshifted validation set = {pr_auc:.4f}; "
+              f"the training notebook recorded {trained_pr}")
+        if trained_pr is None or abs(trained_pr - pr_auc) > 0.05:
+            print("  WARNING: these should match. Until they do, the PR-AUC columns below are NOT "
+                  "trustworthy (check feature order and scaling, or whether the model itself is weak).\n")
+
+    boot = np.array([average_precision_score(y_arr[i], scores[i]) for i in boot_idx])
+    drops = base_boot - boot
+    drop_lo, drop_hi = np.percentile(drops, [2.5, 97.5])
 
     pool = shifted[window_mask]
     psi_hits, psi_scores, ks_hits, ev_any, ev_ds = [], [], [], [], []
@@ -173,7 +195,11 @@ for kind, sev in conditions:
         "condition": f"{kind}@{sev}",
         "pr_auc": pr_auc,
         "pr_auc_drop": baseline_pr_auc - pr_auc,
+        "drop_ci95": f"[{drop_lo:+.3f}, {drop_hi:+.3f}]",
+        "perf_loss_significant": bool(drop_lo > 0),
         "psi_mean": float(np.mean(psi_scores)),
+        "psi_p95": float(np.percentile(psi_scores, 95)),
+        "psi_max": float(np.max(psi_scores)),
         "psi_rate": float(np.mean(psi_hits)),
         "ks_rate": float(np.mean(ks_hits)),
         "evid_any_rate": float(np.mean(ev_any)) if ev_any else np.nan,
@@ -184,16 +210,22 @@ for kind, sev in conditions:
 out = pd.DataFrame(rows)
 out.to_csv("docs/drift_detector_comparison.csv", index=False)
 
-print("\n=== Detection rate per condition (fraction of windows flagged) ===")
-print("The 'none@0' row is the false-positive rate.\n")
+print(f"\n=== Detection rate per condition ({N_TRIALS} windows each; Evidently {N_TRIALS_EVIDENTLY}) ===")
+print("The 'none@0' row is the false-positive rate. perf_loss_significant: the PR-AUC drop's "
+      "bootstrap interval excludes zero.\n")
 print(out.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
 
+none_row = out[out.condition == "none@0"].iloc[0]
+print(f"\nNo-shift PSI over {N_TRIALS} windows: mean {none_row.psi_mean:.3f}, "
+      f"p95 {none_row.psi_p95:.3f}, max {none_row.psi_max:.3f} "
+      f"(current alert threshold {PSI_THRESHOLD}).")
+
 if _stattests_seen:
-    print(f"\nEvidently per-column tests it chose automatically: {sorted(map(str, _stattests_seen))}")
+    print(f"Evidently per-column tests it chose automatically: {sorted(map(str, _stattests_seen))}")
 
 rho, p = spearmanr(out["psi_mean"], out["pr_auc_drop"])
 print(f"\nSpearman correlation between mean PSI score and PR-AUC drop across conditions: "
-      f"rho={rho:.2f} (p={p:.3f})")
+      f"rho={rho:.2f} (p={p:.3f}, n={len(out)} conditions)")
 print(f"Baseline PR-AUC (no shift): {baseline_pr_auc:.4f}")
-print("Caveats: the validation split has under 100 fraud positives, so PR-AUC is noisy; "
-      "N_TRIALS windows per condition gives coarse rates.")
+print("Caveat: the validation split has under 100 fraud positives, so read PR-AUC changes through "
+      "the bootstrap interval, not the point estimate.")

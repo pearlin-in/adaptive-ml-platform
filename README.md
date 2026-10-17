@@ -72,11 +72,13 @@ The React dashboard talks only to the FastAPI read endpoints. It has no knowledg
 
 | Model | Modality | Dataset | Architecture |
 |---|---|---|---|
-| `fraud` | Tabular | Kaggle Credit Card Fraud Detection | LightGBM with `scale_pos_weight` for the ~0.17% positive class |
+| `fraud` | Tabular | Kaggle Credit Card Fraud Detection | Regularized LightGBM with square-root class weighting (holdout PR-AUC 0.386) |
 | `satellite` | Image | EuroSAT (`tanganke/eurosat` on Hugging Face) | Fine-tuned MobileNetV3-Small, 10 land-use classes |
 | `ai_text` | Text | HC3 (human vs. ChatGPT answers) | Fine-tuned DistilBERT, binary human/AI |
 
 Training notebooks are in `notebooks/`. Validation metrics for each model are saved in `models/<name>/metrics_v1.json`.
+
+The fraud model's PR-AUC is modest. An earlier version trained with full `scale_pos_weight` scored 0.107, and cross-validation showed it could not even fit its own training data. Average precision still varies by about ±0.15 across folds, so treat 0.386 as an estimate. The model is not the point of this project.
 
 The AI-text detector reaches 99.47% accuracy, 99.16% F1, and 99.99% ROC-AUC on a held-out HC3 split, grouped by question to avoid leakage. That reflects how separable HC3 is, not general AI-text-detection ability. The drift demo above is the more honest test.
 
@@ -97,14 +99,40 @@ The ai_text threshold started as an untested guess of 0.15. Text from a current-
 
 ## Evaluating the drift detector
 
-`scripts/compare_drift_detectors.py` compares this project's PSI detector against scipy's two-sample KS test and Evidently on the fraud model, under controlled shifts of increasing severity. For each condition it reports each detector's detection rate, the false-positive rate with no shift, and the fraud model's real PR-AUC drop. It shifts both the most and least important features, to test whether a drift alarm tracks actual performance loss.
+`scripts/compare_drift_detectors.py` compares this project's PSI detector against scipy's two-sample KS test (Bonferroni-corrected) and Evidently's default data drift preset on the fraud model. Every detector sees the same 200-row windows, scored against a 2,000-row reference sample. Shifts are synthetic, with controlled severity, and each is paired with the fraud model's real PR-AUC change (paired bootstrap, 95% interval). Results are in `docs/drift_detector_comparison.csv`.
+
+**False alarms on clean data (200 windows)**
+
+| Detector | False alarm rate |
+|---|---|
+| PSI, max feature, threshold 0.25 | 0% (highest clean score 0.195) |
+| scipy KS per feature, Bonferroni, alpha 0.05 | 6% |
+| Evidently, any column drifted (defaults) | 100% (10 windows) |
+| Evidently, dataset-level rule (defaults) | 30% (10 windows) |
+
+**Sensitivity to a single-feature shift (Amount scaled up)**
+
+| Amount multiplier | PSI flags | KS flags | PR-AUC change |
+|---|---|---|---|
+| x1.5 | 8% | 23.5% | none detectable |
+| x2 | 25.5% | 85.5% | none detectable |
+| x3 | 95% | 100% | none detectable |
+| x5 | 100% | 100% | none detectable |
+
+**What it shows**
+
+- PSI at 0.25 is conservative: no false alarms, but clearly less sensitive than KS on single-feature shifts (Amount x2: 25.5% vs 85.5%).
+- Shifting 3 or 8 features by at least 0.5 standard deviations was flagged in 100% of windows by both PSI and KS. Six of the 12 shift conditions caused a statistically significant PR-AUC loss, and PSI and KS flagged all six. They also flagged four of the six conditions that caused no loss (for example, Amount x3 to x5 left PR-AUC unchanged). Input-drift alarms cannot tell harmful drift from harmless drift. That takes ground-truth labels, which is why label-based performance monitoring is on the roadmap.
+- Max-feature PSI saturates at about 4.55 with 10 bins and 200-row windows, so it cannot rank shift severity beyond that point.
+- Across the 13 conditions, mean PSI and PR-AUC drop were not significantly correlated (Spearman 0.32, p = 0.28).
+- Evidently's defaults (normalized Wasserstein) were noisy at this window size. This compares defaults on only 10 windows per condition, not a tuned configuration.
+
+Caveats: one model, fewer than 100 validation positives, synthetic shifts.
 
 ```powershell
-pip install evidently scipy
+pip install scipy "evidently<0.5"
 python -m scripts.compare_drift_detectors
 ```
-
-Results are written to `docs/drift_detector_comparison.csv`.
 
 ## Performance
 
@@ -112,9 +140,11 @@ Results are written to `docs/drift_detector_comparison.csv`.
 
 | Model | Unbatched | Batched | Speedup | p99 unbatched / batched |
 |---|---|---|---|---|
-| fraud | 118.69 req/s | 1605.51 req/s | 13.53x | 398.95 ms / 23.42 ms |
-| satellite | 84.69 req/s | 202.08 req/s | 2.39x | 466.60 ms / 269.63 ms |
-| ai_text | 64.15 req/s | 99.98 req/s | 1.56x | 560.04 ms / 339.44 ms |
+| fraud | 70.74 req/s | 1058.49 req/s | 14.96x | 525.70 ms / 31.36 ms |
+| satellite | 61.42 req/s | 153.08 req/s | 2.49x | 659.55 ms / 397.73 ms |
+| ai_text | 50.66 req/s | 75.18 req/s | 1.48x | 827.91 ms / 501.91 ms |
+
+Absolute throughput varies between runs on the same machine. An earlier run of the same benchmark gave 84.69 and 202.08 req/s for the unchanged satellite model, about 30% higher. The speedup ratios were far more stable (2.39x vs 2.49x for satellite, 1.56x vs 1.48x for ai_text), so read the ratios, not the absolute numbers.
 
 The fraud speedup is mostly not compute amortization, since a single LightGBM row prediction is sub-millisecond. Collapsing many concurrent per-item thread-pool submissions into a few batched ones removes GIL and thread-pool contention. The neural models gain from batched tensor operations, partly offset by per-item image and text preprocessing. For satellite, `ToTensor()` dominated preprocessing, not resizing.
 
@@ -299,7 +329,7 @@ Problems found and fixed while building this, each caught by measurement rather 
 - The SQLite audit log lags live traffic by up to the flush interval. The in-memory counters behind `/metrics` are exact.
 - Rollback picks the previous version by sorted version name, not from a true history stack. It is correct only if versions are promoted in order.
 - Drift references are static per version. There is no automated retraining or reference-refresh pipeline.
-- Drift detection is based on inputs only. Without ground-truth labels it cannot say whether a drift alarm means accuracy actually dropped.
+- Drift detection is based on inputs only. In the fraud evaluation it flagged every harmful shift but also shifts that left accuracy unchanged, so it works as an early-warning signal, not a measure of model quality.
 - The AI-text detector's headline accuracy is dataset-specific.
 
 ## Troubleshooting

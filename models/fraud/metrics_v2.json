@@ -1,4 +1,16 @@
 {
-  "pr_auc": 0.10690529836746003,
-  "roc_auc": 0.8819455909122229
+  "pr_auc": 0.38642207987552324,
+  "roc_auc": 0.8591218000987677,
+  "model": "LGBMClassifier",
+  "params": {
+    "n_estimators": 400.0,
+    "learning_rate": 0.03,
+    "num_leaves": 15.0,
+    "min_child_samples": 50.0,
+    "subsample": 0.8,
+    "subsample_freq": 1.0,
+    "colsample_bytree": 0.8,
+    "scale_pos_weight": 24.026793419648342
+  },
+  "note": "Single stratified 80/20 split (random_state=42), 98 validation positives. Average precision varied by about +/-0.15 across 5 CV folds, so treat this as an estimate."
 }
